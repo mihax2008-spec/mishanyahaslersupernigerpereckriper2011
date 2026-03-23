@@ -1,0 +1,150 @@
+import os
+import logging
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
+from openai import OpenAI
+from dotenv import load_dotenv
+
+# Загрузка переменных окружения
+load_dotenv()
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+API_KEY = os.getenv("OPENAI_API_KEY")          # ключ для aitunnel.ru
+BASE_URL = "https://api.aitunnel.ru/v1"        # указанный эндпоинт
+
+# Настройка логгера
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger(name)
+
+# Инициализация клиента OpenAI с кастомным base_url
+client = OpenAI(
+    api_key=API_KEY,
+    base_url=BASE_URL
+)
+
+# Системный промпт для кулинарной экспертизы (исправлена опечатка)
+CULINARY_SYSTEM_PROMPT = """
+Ты - шеф-повар мирового класса с 25-летним опытом. Создавай уникальные, простые рецепты.
+Формат ответа (обязательно используй HTML-разметку):
+<strong>🍽 Название блюда:</strong> [Название блюда с эмодзи]
+<strong>⏱️ Время приготовления:</strong> [Общее время]
+<strong>🍽 Порций:</strong> [Количество]
+<strong>🔥 Калорийность:</strong> [Ккал на порцию]
+
+<strong>🥦 Ингредиенты:</strong>
+- [Ингредиент 1] (Точное количество)
+- [Ингредиент 2] (Точное количество)
+
+<strong>👨‍🍳риготовление:</strong>
+1. Шаг 1...
+2. Шаг 2...
+
+<strong>💡 Советы шефа:</strong>
+- Совет 1
+- Совет 2
+
+<strong>🏷 Теги:</strong> #тег1 #тег2
+Форматируй ответ с использованием эмодзи и без #.
+"""
+
+# Клавиатура с кнопками "Старт" и "Случайный рецепт"
+keyboard = [
+    [KeyboardButton("🏠 Старт"), KeyboardButton("🍽 Случайный рецепт")]
+]
+reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /start и кнопки «Старт»"""
+    user = update.effective_user
+    await update.message.reply_html(
+        f"👨‍🍳дравствуйте, {user.first_name}! Я - ваш личный AI-шеф.\n"
+        "Просто напишите, что вы хотите приготовить, например:\n"
+        "• Быстрый ужин из курицы\n"
+        "• Вегетарианское блюдо на завтрак\n"
+        "• Десерт с шоколадом\n\n"
+        "Или нажмите кнопку «Случайный рецепт» для вдохновения! 🍳",
+        reply_markup=reply_markup
+    )
+
+async def generate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Генерация рецепта по запросу пользователя"""
+    user_request = update.message.text
+    chat_id = update.message.chat_id
+
+    # Если пользователь нажал кнопку "Случайный рецепт"
+    if user_request == "🍽 Случайный рецепт":
+        user_request = "Предложи случайный рецепт блюда, которое можно приготовить дома."
+    # Если нажата кнопка "Старт" — вызываем start
+    elif user_request == "🏠 Старт":
+        await start(update, context)
+        return
+
+    try:
+        # Отправляем статус "печатает"
+        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+
+        # Вызов API через клиент OpenAI (модель gpt-4o-mini)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",          # модель не меняется
+            messages=[
+                {"role": "system", "content": CULINARY_SYSTEM_PROMPT},
+                {"role": "user", "content": user_request}
+            ],
+            temperature=0.7,
+            max_tokens=2000
+        )
+
+        recipe = response.choices[0].message.content.strip()
+
+        # Сохраняем последний рецепт в контексте пользователя
+        context.user_data['last_recipe'] = recipe
+
+        # Отправка рецепта с HTML-форматированием
+        await update.message.reply_text(recipe, parse_mode="HTML")
+
+    except Exception as e:
+        logger.error(f"Ошибка генерации рецепта: {e}")
+        await update.message.reply_text(
+            "🍳 Извините, на кухне возникла непредвиденная ситуация... "
+            "Пожалуйста, попробуйте позже."
+        )
+  async def random_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /random — генерирует случайный рецепт"""
+    # Имитируем нажатие кнопки "Случайный рецепт"
+    update.message.text = "🍽 Случайный рецепт"
+    await generate_recipe(update, context)
+
+async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик изображений (заглушка)"""
+    await update.message.reply_text(
+        "📸 Отличное фото! В будущем я смогу анализировать ваши ингредиенты по фото. "
+        "А пока просто опишите, что вы хотите приготовить."
+    )
+
+def main():
+    """Запуск бота"""
+    if not TOKEN or not API_KEY:
+        logger.error("Отсутствуют необходимые переменные окружения: TELEGRAM_TOKEN или OPENAI_API_KEY")
+        return
+
+    application = Application.builder().token(TOKEN).build()
+
+    # Регистрация обработчиков
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("random", random_recipe))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, generate_recipe))
+    application.add_handler(MessageHandler(filters.PHOTO, handle_image))
+
+    # Запуск бота
+    application.run_polling()
+
+if name == "main":
+    main()
