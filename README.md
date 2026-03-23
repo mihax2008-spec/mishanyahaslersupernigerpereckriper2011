@@ -23,6 +23,7 @@ cd ai-chef-bot
 
 
 Установите зависимости:
+
 bash
 pip install python-telegram-bot openai python-dotenv
 
@@ -30,7 +31,9 @@ pip install python-telegram-bot openai python-dotenv
 Настройте переменные окружения:
 Создайте файл .env в корне проекта и добавьте:
 env
+
 TELEGRAM_TOKEN=твой_токен_от_BotFather
+
 OPENAI_API_KEY=твой_ключ_от_aitunnel
 
 
