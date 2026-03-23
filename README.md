@@ -15,11 +15,6 @@ HTML-форматирование: Текст легко читать благо
 Библиотека: python-telegram-bot (v20+)
 AI Мозг: OpenAI API (GPT-4o-mini) через прокси aitunnel.ru
 Управление окружением: python-dotenv
-📋 Как запустить
-Клонируйте репозиторий:
-bash
-git clone https://github.com
-cd ai-chef-bot
 
 
 Установите зависимости:
