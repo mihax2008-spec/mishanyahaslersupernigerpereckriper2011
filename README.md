@@ -1,3 +1,6 @@
+<img width="7344" height="8833" alt="deepseek_mermaid_20260323_416cf2" src="https://github.com/user-attachments/assets/50decf92-9844-4b23-b161-651beaaf65a5" />
+
+
 # Рецерпты от AI-шефа
 🍳 AI Chef Telegram Bot
 AI Chef — это умный кулинарный помощник в Telegram, работающий на базе нейросети GPT-4o-mini. Бот выступает в роли профессионального шеф-повара с 25-летним стажем, генерируя уникальные рецепты по любым запросам пользователя.
